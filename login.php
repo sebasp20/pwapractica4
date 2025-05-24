@@ -1,32 +1,62 @@
 <?php
 session_start();
-require 'config.php';
+include('../includes/db.php');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
+// Verifica si ya hay sesión
+if (isset($_SESSION['usuario'])) {
+    $rol = $_SESSION['usuario']['rol'];
+    header("Location: ../$rol/dashboard.php");
+    exit();
+}
 
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
-    $stmt->execute([$username]);
-    $user = $stmt->fetch();
+// Proceso del formulario
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = trim($_POST['email']);
+    $contrasena = trim($_POST['contrasena']);
 
-    if ($user && password_verify($password, $user['password_hash'])) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['role'] = $user['role'];
-        header('Location: tareas.php');
-        exit;
+    if (empty($email) || empty($contrasena)) {
+        $error = "Ingrese email y contraseña.";
     } else {
-        $error = "Usuario o contraseña incorrectos.";
+        $stmt = $conn->prepare("SELECT * FROM usuarios WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($usuario = $result->fetch_assoc()) {
+            // Validación simple: compara texto plano
+            if ($usuario['contrasena'] === $contrasena) {
+                $_SESSION['usuario'] = $usuario;
+                header("Location: ../{$usuario['rol']}/dashboard.php");
+                exit();
+            } else {
+                $error = "Contraseña incorrecta.";
+            }
+        } else {
+            $error = "Usuario no encontrado.";
+        }
     }
 }
 ?>
 
-<h2>Iniciar sesión</h2>
-<?php if (!empty($error)) echo "<p style='color:red;'>$error</p>"; ?>
-<form method="POST">
-    <label>Usuario: <input type="text" name="username" required></label><br>
-    <label>Contraseña: <input type="password" name="password" required></label><br>
-    <button type="submit">Entrar</button>
-</form>
-<p><a href="register.php">Registrar nuevo usuario</a></p>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Tareas</title>
+</head>
+<body>
+    <h2>Iniciar Sesión</h2>
+    <?php if (isset($error)): ?>
+        <p style="color:red;"><?= $error ?></p>
+    <?php endif; ?>
+    <form method="POST">
+        <label>Email:</label><br>
+        <input type="text" name="email"><br><br>
+        <label>Contraseña:</label><br>
+        <input type="password" name="contrasena"><br><br>
+        <button type="submit">Entrar</button>
+    </form>
+</body>
+</html>
+
+
